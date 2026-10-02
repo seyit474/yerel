@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yerel</title>
+<style>
+:root { --acc:#2B59C3; --bg:#fff; --bg2:#f3f5f9; --tx:#141a24; --tx2:#5d6878; --line:#e1e6ee; --bad:#d93a3a; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --acc:#5b86e5; --bg:#121822; --bg2:#1a2230; --tx:#e6eaf1; --tx2:#9aa6b8; --line:#263042; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin:0; font:15px/1.45 system-ui, Roboto, sans-serif; background:var(--bg2); color:var(--tx); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+.card { width:100%; max-width:420px; background:var(--bg); border-radius:22px; padding:26px 22px; box-shadow:0 6px 24px rgba(0,0,0,.08); }
+.logo { width:64px; height:64px; border-radius:18px; background:var(--acc); display:grid; place-items:center; margin:0 auto 12px; }
+.logo svg { width:36px; height:36px; }
+h1 { text-align:center; font-size:22px; margin:0; }
+.sub { text-align:center; color:var(--tx2); font-size:14px; margin:6px 0 18px; }
+.err { background:color-mix(in srgb, var(--bad) 12%, var(--bg)); color:var(--tx); border-radius:12px; padding:10px 12px; font-size:13.5px; margin-bottom:14px; }
+h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--tx2); margin:18px 0 8px; display:flex; align-items:center; gap:8px; }
+.list { display:flex; flex-direction:column; gap:8px; }
+.srv { display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:14px; background:var(--bg2); border:0; width:100%; text-align:left; color:var(--tx); font:inherit; cursor:pointer; }
+.srv b { display:block; }
+.srv small { color:var(--tx2); }
+.dot { width:10px; height:10px; border-radius:50%; background:#22b55e; flex:none; }
+.empty { color:var(--tx2); font-size:14px; padding:6px 2px; }
+.row { display:flex; gap:8px; }
+input { flex:1; min-width:0; height:46px; padding:0 14px; border-radius:12px; border:1.5px solid var(--line); background:var(--bg2); color:var(--tx); font:inherit; outline:none; }
+input:focus { border-color:var(--acc); }
+button.btn { height:46px; padding:0 18px; border-radius:12px; border:0; background:var(--acc); color:#fff; font:600 15px system-ui, sans-serif; }
+button.ghost { background:var(--bg2); color:var(--tx); }
+.spin { width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:r .8s linear infinite; display:inline-block; }
+@keyframes r { to { transform:rotate(360deg); } }
+.hint { color:var(--tx2); font-size:12.5px; margin-top:16px; line-height:1.5; }
+code { background:var(--bg2); padding:1px 5px; border-radius:5px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 3C6.48 3 2 6.94 2 11.8c0 2.4 1.1 4.57 2.88 6.16L4 21.5l4.1-1.86c1.2.41 2.52.66 3.9.66 5.52 0 10-3.94 10-8.5S17.52 3 12 3z"/></svg></div>
+  <h1>Yerel</h1>
+  <p class="sub">Aynı Wi-Fi'daki Yerel sunucusuna bağlan.</p>
+  <div class="err" id="err" hidden></div>
+
+  <h2>Ağdaki sunucular <span class="spin" id="spin" hidden></span></h2>
+  <div class="list" id="list"><div class="empty">Aranıyor…</div></div>
+  <div class="row" style="margin-top:10px"><button class="btn ghost" id="rescan" style="width:100%">Tekrar ara</button></div>
+
+  <h2>Elle gir</h2>
+  <div class="row">
+    <input id="addr" placeholder="192.168.1.20" inputmode="url" autocapitalize="none" autocomplete="off" spellcheck="false">
+    <button class="btn" id="go">Bağlan</button>
+  </div>
+  <p class="hint">Sunucuyu Termux'ta <code>bash baslat.sh</code> ile başlat. Port yazmazsan <code>https://…:8443</code> kullanılır.</p>
+</div>
+<script>
+var A = window.YerelApp;
+var q = new URLSearchParams(location.search);
+if (q.get("e")) { var e = document.getElementById("err"); e.textContent = q.get("e"); e.hidden = false; }
+var cur = q.get("s") || (A ? A.server() : "");
+if (cur) { try { document.getElementById("addr").value = new URL(cur).host; } catch (x) {} }
+
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+function scan() {
+  document.getElementById("spin").hidden = false;
+  document.getElementById("rescan").disabled = true;
+  document.getElementById("list").innerHTML = '<div class="empty">Aranıyor… (birkaç saniye)</div>';
+  if (A) A.scan(); else onScan([]);
+}
+window.onScan = function (arr) {
+  document.getElementById("spin").hidden = true;
+  document.getElementById("rescan").disabled = false;
+  var l = document.getElementById("list");
+  arr.sort(function (a, b) { return (a.ip === "127.0.0.1") - (b.ip === "127.0.0.1"); });
+  if (!arr.length) { l.innerHTML = '<div class="empty">Bulunamadı. Sunucu açık mı, aynı Wi-Fi\'da mısın? Adresi aşağıya elle de yazabilirsin.</div>'; return; }
+  l.innerHTML = arr.map(function (s) {
+    return '<button class="srv" data-u="' + esc(s.url) + '"><span class="dot"></span><span><b>' + esc(s.ip) + (s.self ? " (bu telefon)" : "") +
+      '</b><small>' + s.users + " kullanıcı</small></span></button>";
+  }).join("");
+};
+document.getElementById("list").onclick = function (e) {
+  var b = e.target.closest("[data-u]");
+  if (b && A) A.connect(b.getAttribute("data-u"));
+};
+document.getElementById("rescan").onclick = scan;
+function go() {
+  var v = document.getElementById("addr").value;
+  if (!A || !A.connect(v)) { var e = document.getElementById("err"); e.textContent = "Geçersiz adres"; e.hidden = false; }
+}
+document.getElementById("go").onclick = go;
+document.getElementById("addr").onkeydown = function (e) { if (e.key === "Enter") go(); };
+scan();
+</script>
+</body>
+</html>
